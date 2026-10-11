@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TSUKUYOMI — Wink Trigger</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Share+Tech+Mono&display=swap');
+:root{--r:#ff1738;--bg:#030207}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:#fff;font-family:'Share Tech Mono',monospace}
+#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:brightness(.62) contrast(1.15) saturate(.8);z-index:0;will-change:transform,filter}
+#fx{position:fixed;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+#vignette{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(ellipse,transparent 20%,#03020765 75%,#030207cc)}
+#scan{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;background:repeating-linear-gradient(0deg,#0000 0 2px,#00000038 2px 3px);mix-blend-mode:multiply;transition:opacity .6s}
+body.on #scan{opacity:1}
+#ui{position:fixed;inset:0;z-index:3;display:flex;flex-direction:column;justify-content:space-between;padding:clamp(14px,2.4vw,34px);pointer-events:none;transition:opacity .35s}
+#ui.hidden .controls{pointer-events:none}
+.top,.bottom{display:flex;justify-content:space-between;align-items:flex-start;gap:15px}
+.logo{font:900 clamp(20px,3vw,34px) Cinzel,serif;letter-spacing:.12em;text-shadow:0 0 18px #ff173866}.logo span{color:var(--r)}
+.sub{font-size:10px;color:#c5b4bf;letter-spacing:.14em;margin-top:5px}
+.badge{font-size:10px;letter-spacing:.08em;border:1px solid #ff173866;background:#09030bd9;padding:10px 12px;backdrop-filter:blur(8px);min-width:230px}
+.red{color:#ff667c}
+.gauge{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:9px;color:#c5b4bf}.gauge i{flex:1;height:5px;background:#ffffff1a;position:relative;overflow:hidden}.gauge b{position:absolute;inset:0 auto 0 0;width:0;background:#5a5a66;transition:background .15s}.gauge.open b{background:var(--r);box-shadow:0 0 10px var(--r)}
+.center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:min(90vw,680px)}
+.center h1{font:900 clamp(40px,8vw,96px)/.92 Cinzel,serif;letter-spacing:-.03em;margin:0;text-shadow:0 0 35px #ff173866}.center h1 span{color:var(--r)}
+.center p{font-size:clamp(10px,1.2vw,13px);color:#ddcbd3;line-height:1.8;letter-spacing:.1em}
+.bottom{align-items:flex-end}.instructions{font-size:10px;line-height:1.8;color:#c5b4bf}.instructions b{color:#ff566d;font-weight:400}
+.controls{display:flex;gap:8px;pointer-events:auto;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+button,select{font:11px 'Share Tech Mono',monospace;letter-spacing:.08em;color:#fff;background:#12050be8;border:1px solid #ff173877;padding:12px 14px;cursor:pointer}
+button:hover,select:hover{background:#360512;border-color:#ff1738}button.primary{background:var(--r);color:#160108;border-color:var(--r);font-weight:bold}
+label.sl{font-size:9px;color:#c5b4bf;display:flex;flex-direction:column;gap:4px}input[type=range]{accent-color:#ff1738;width:96px}
+button:focus-visible,select:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#start{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#390817,#050309 70%);padding:24px;text-align:center;transition:opacity .5s}
+.box{max-width:620px}.kicker{color:#ff5269;font-size:11px;letter-spacing:.3em}
+.box h2{font:900 clamp(40px,8vw,80px)/.92 Cinzel,serif;margin:18px 0}.box h2 span{color:var(--r)}
+.box p{color:#d0c1ca;font-size:13px;line-height:1.8;max-width:500px;margin:0 auto 22px}.box .primary{padding:16px 25px}
+.fine{color:#897b87;font-size:10px;line-height:1.7;margin-top:17px}
+#flash{position:fixed;inset:0;z-index:5;background:#ff1838;opacity:0;pointer-events:none}#flash.go{animation:flash .7s ease-out}@keyframes flash{0%{opacity:.9}100%{opacity:0}}
+#statusToast{position:fixed;z-index:7;bottom:22px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.12em;padding:10px 14px;background:#09030bf0;border:1px solid #ff173866;color:#ff657a;opacity:0;pointer-events:none;transition:opacity .2s}
+.hidden{opacity:0!important}
+@media(max-width:600px){.sub{font-size:8px}.badge{font-size:8px;padding:8px;min-width:150px}.instructions{max-width:44%;font-size:8px}button,select{font-size:9px;padding:9px}input[type=range]{width:70px}}
+@media(prefers-reduced-motion:reduce){#flash.go{animation-duration:.2s}}
+</style></head>
+<body>
+<video id="cam" autoplay playsinline muted></video><canvas id="fx"></canvas><div id="vignette"></div><div id="scan"></div><div id="flash"></div>
+<div id="ui">
+ <div class="top">
+  <div><div class="logo">月読 <span>TSUKUYOMI</span></div><div class="sub">UCHIHA WINK-TRIGGERED GENJUTSU</div></div>
+  <div class="badge"><span class="red">●</span> <span id="live">EYE SENSOR: STANDBY</span>
+   <div class="gauge" id="gR"><span>KANAN</span><i><b></b></i></div>
+   <div class="gauge" id="gL"><span>KIRI&nbsp;&nbsp;</span><i><b></b></i></div></div>
+ </div>
+ <div class="center" id="center"><h1>ONE EYE<br><span>OPEN.</span></h1><p>TUTUP SATU MATA, BIARKAN SATU TERBUKA<br>SHARINGAN TERKUNCI → TSUKUYOMI DIMULAI</p></div>
+ <div class="bottom">
+  <div class="instructions">[ <b>WINK / SATU MATA TERBUKA</b> ] TSUKUYOMI AKTIF<br>[ <b>KEDUA MATA SAMA</b> ] KEMBALI KE REALITAS<br>[ <b>SPACE</b> ] TES MANUAL · [ <b>F</b> ] FULLSCREEN · [ <b>R</b> ] KALIBRASI</div>
+  <div class="controls">
+   <label class="sl">SENSITIVITAS<input type="range" id="sens" min="0.8" max="1.25" step="0.01" value="1"></label>
+   <select id="mode" aria-label="Mata pemicu"><option value="any">MATA MANA SAJA</option><option value="0">HANYA KANAN TERBUKA</option><option value="1">HANYA KIRI TERBUKA</option></select>
+   <button id="recal">KALIBRASI</button><button id="mute">SUARA: ON</button><button id="test">TEST</button><button id="capture">✦ CAPTURE</button>
+  </div>
+ </div>
+</div>
+<div id="start"><div class="box"><div class="kicker">UCHIHA CLAN · FORBIDDEN TECHNIQUE</div><h2>THE EYE<br>THAT <span>TRAPS</span><br>REALITY.</h2>
+<p>Webcam memantau kedua mata secara terpisah. Saat hanya satu mata yang terbuka, Sharingan terkunci di mata itu, lalu Tsukuyomi menelan layar: bulan merah, gagak, dan dunia yang terbalik. Berkedip dengan kedua mata tidak memicu apa-apa.</p>
+<button class="primary" id="enable">◉ AKTIFKAN EYE TRACKING</button>
+<div class="fine">Gunakan Chrome / Edge lewat localhost atau HTTPS · Perlu internet untuk model face landmarks<br>Video diproses di browser · Pastikan wajah terang dan menghadap kamera</div></div></div>
+<div id="statusToast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script>
+const $=id=>document.getElementById(id),video=$('cam'),cv=$('fx'),ctx=cv.getContext('2d');
+const rand=(a,b)=>a+Math.random()*(b-a),ease=x=>1-Math.pow(1-x,3),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+let W,H,DPR=1,frame=0,k=0,active=false,manualUntil=0,holdT=0,charge=0,lastFace=0,winkNow=false,winkEye=null,t0=0,shake=0,last=performance.now();
+let crows=[],parts=[],drips=[],sens=1,mode='any',muted=false,AC,master,drone,faceOK=false;
+const eyes=[
+ {id:'gR',v:[[159,145],[160,144],[158,153]],w:[33,133],iris:468,s:.3,base:.28,n:1,open:true,x:0,y:0,r:30},
+ {id:'gL',v:[[386,374],[387,373],[385,380]],w:[362,263],iris:473,s:.3,base:.28,n:1,open:true,x:0,y:0,r:30}];
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=cv.width=innerWidth*DPR;H=cv.height=innerHeight*DPR}addEventListener('resize',resize);resize();
+function toast(s){const t=$('statusToast');t.textContent=s;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,1400)}
+function setLive(s){$('live').textContent=s}
+/* ---------- AUDIO (sintesis WebAudio, tanpa file) ---------- */
+function audioInit(){try{if(!AC){AC=new(window.AudioContext||webkitAudioContext)();master=AC.createGain();master.gain.value=.6;master.connect(AC.destination)}AC.resume()}catch(e){}}
+function sfxOn(){if(muted||!AC)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(28,t+1.3);g.gain.setValueAtTime(.95,t);g.gain.exponentialRampToValueAtTime(.001,t+1.8);o.connect(g).connect(master);o.start(t);o.stop(t+1.9);
+ const d1=AC.createOscillator(),d2=AC.createOscillator(),f=AC.createBiquadFilter(),dg=AC.createGain();d1.type=d2.type='sawtooth';d1.frequency.value=55;d2.frequency.value=55.8;f.type='lowpass';f.frequency.value=240;dg.gain.setValueAtTime(0,t);dg.gain.linearRampToValueAtTime(.16,t+1.6);d1.connect(f);d2.connect(f);f.connect(dg).connect(master);d1.start();d2.start();drone={d1,d2,dg}}
+function sfxOff(){if(!drone||!AC)return;const t=AC.currentTime,d=drone;d.dg.gain.cancelScheduledValues(t);d.dg.gain.setValueAtTime(d.dg.gain.value,t);d.dg.gain.linearRampToValueAtTime(0,t+.5);d.d1.stop(t+.6);d.d2.stop(t+.6);drone=null}
+/* ---------- DETEKSI MATA ---------- */
+function map(p){const vw=video.videoWidth||1280,vh=video.videoHeight||720,s=Math.max(W/vw,H/vh);return{x:W-(p.x*vw*s+(W-vw*s)/2),y:p.y*vh*s+(H-vh*s)/2}}
+function onFace(res){const now=performance.now(),lm=res.multiFaceLandmarks&&res.multiFaceLandmarks[0];
+ if(!lm){faceOK=false;winkNow=false;setLive('WAJAH TIDAK TERDETEKSI');return}
+ faceOK=true;lastFace=now;const d=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),lo=.58*sens,hi=Math.min(.74*sens,.95);
+ eyes.forEach(e=>{
+  const w=d(lm[e.w[0]],lm[e.w[1]])||1,r=e.v.reduce((a,[u,l])=>a+d(lm[u],lm[l]),0)/e.v.length/w;
+  e.s+=(r-e.s)*.55;                                   // haluskan noise
+  if(e.s>e.base)e.base+=(e.s-e.base)*.15;else e.base-=(e.base-e.s)*.0012; // baseline "terbuka" adaptif per mata
+  e.base=Math.max(e.base,.2);e.n=e.s/e.base;
+  e.open=e.open?e.n>lo:e.n>hi;                        // histeresis anti-flicker
+  const p=map(lm[e.iris]||lm[e.v[0][0]]),a=map(lm[e.w[0]]),b=map(lm[e.w[1]]);
+  e.x+=(p.x-e.x)*.5;e.y+=(p.y-e.y)*.5;e.r=Math.max(Math.abs(a.x-b.x)*.55,14*DPR);
+  const g=$(e.id);g.classList.toggle('open',e.open);g.querySelector('b').style.width=clamp(e.n/1.1)*100+'%'});
+ const [R,L]=eyes,oneOpen=R.open!==L.open&&Math.abs(R.n-L.n)>.22;
+ let ok=oneOpen;if(ok&&mode!=='any')ok=eyes[+mode].open;
+ winkNow=ok;if(ok)winkEye=R.open?R:L;
+ setLive(ok?`WINK · MATA ${winkEye===R?'KANAN':'KIRI'} TERBUKA`:R.open&&L.open?'KEDUA MATA TERBUKA':!R.open&&!L.open?'KEDUA MATA TERTUTUP':'WINK TIDAK SESUAI MODE')}
+/* ---------- GAMBAR ---------- */
+function sharingan(r,rot,a=1){ctx.save();ctx.globalAlpha*=a;ctx.rotate(rot);const g=ctx.createRadialGradient(0,0,r*.1,0,0,r);g.addColorStop(0,'#ff5063');g.addColorStop(1,'#a00018');
+ ctx.shadowColor='#ff0030';ctx.shadowBlur=r*.7;ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();ctx.shadowBlur=0;
+ ctx.strokeStyle='#14000a';ctx.lineWidth=r*.07;ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.stroke();ctx.lineWidth=r*.04;ctx.beginPath();ctx.arc(0,0,r*.62,0,7);ctx.stroke();
+ ctx.fillStyle='#14000a';ctx.beginPath();ctx.arc(0,0,r*.17,0,7);ctx.fill();
+ for(let i=0;i<3;i++){ctx.save();ctx.rotate(i*2.0944);ctx.beginPath();ctx.arc(0,-r*.62,r*.13,0,7);ctx.fill();ctx.beginPath();ctx.moveTo(-r*.13,-r*.62);ctx.quadraticCurveTo(-r*.42,-r*.5,-r*.45,-r*.2);ctx.quadraticCurveTo(-r*.28,-r*.42,0,-r*.5);ctx.fill();ctx.restore()}ctx.restore()}
+function mangekyo(r,rot){ctx.save();ctx.rotate(rot);ctx.fillStyle=ctx.strokeStyle='#0a0004';ctx.beginPath();ctx.arc(0,0,r*.12,0,7);ctx.fill();
+ for(let i=0;i<3;i++){ctx.save();ctx.rotate(i*2.0944);ctx.beginPath();ctx.moveTo(0,-r*.14);ctx.bezierCurveTo(r*.55,-r*.2,r*.78,-r*.62,r*.2,-r*.92);ctx.bezierCurveTo(r*.5,-r*.55,r*.3,-r*.35,0,-r*.14);ctx.fill();ctx.restore()}
+ ctx.lineWidth=r*.03;ctx.beginPath();ctx.arc(0,0,r*.98,0,7);ctx.stroke();ctx.restore()}
+function addCrow(){crows.push({a:rand(0,6.28),rad:rand(.1,.8)*Math.min(W,H)*1.1,sp:rand(.006,.02)*(Math.random()<.5?-1:1),s:rand(10,26)*DPR,life:rand(400,1000),age:0,ph:rand(0,6.28),px:0,py:0})}
+function drawCrow(c,cx,cy){const e=ease(Math.min(1,c.age/70)),rr=c.rad*e;c.a+=c.sp;c.age++;c.life--;
+ const x=cx+Math.cos(c.a)*rr,y=cy+Math.sin(c.a*1.3+c.ph)*rr*.6,ang=c.age>1?Math.atan2(y-c.py,x-c.px):0;c.px=x;c.py=y;
+ const f=Math.sin(frame*.35+c.ph);ctx.save();ctx.globalAlpha=k*Math.min(1,c.age/30,c.life/40);ctx.translate(x,y);ctx.rotate(ang);if(Math.cos(ang)<0)ctx.scale(1,-1);const s=c.s/12;ctx.scale(s,s);
+ ctx.fillStyle='#05000a';ctx.beginPath();ctx.ellipse(0,0,9,3.5,0,0,7);ctx.arc(9,-.5,2.7,0,7);ctx.fill();ctx.beginPath();ctx.moveTo(11,-1);ctx.lineTo(16,0);ctx.lineTo(11,1);ctx.fill();
+ for(const m of[-1,1]){ctx.beginPath();ctx.moveTo(3,0);ctx.quadraticCurveTo(-5,m*16*f,-18,m*13*f);ctx.quadraticCurveTo(-8,m*4*f,-7,0);ctx.fill()}
+ ctx.fillStyle='#ff1838';ctx.beginPath();ctx.arc(10,-1,.9,0,7);ctx.fill();ctx.restore()}
+function burst(x,y,n,sp=5){for(let i=0;i<n;i++){const a=rand(0,6.28),v=rand(.5,sp)*DPR;parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rand(40,120),max:120,r:rand(1,3.5)*DPR})}}
+function scene(dt,now){
+ const R=Math.min(W,H),cx=W/2,cy=H*.42,tt=(now-t0)/1000;
+ ctx.save();if(shake>0){ctx.translate(rand(-1,1)*shake*16*DPR,rand(-1,1)*shake*16*DPR);shake=Math.max(0,shake-dt*1.5)}
+ ctx.globalAlpha=k;let g=ctx.createRadialGradient(cx,cy,R*.05,cx,cy,Math.max(W,H)*.85);g.addColorStop(0,'rgba(230,0,45,.6)');g.addColorStop(.35,'rgba(110,0,25,.58)');g.addColorStop(1,'rgba(3,0,6,.9)');ctx.fillStyle=g;ctx.fillRect(-60,-60,W+120,H+120);
+ // sinar berputar
+ ctx.save();ctx.translate(cx,cy);ctx.rotate(tt*.14);const N=30;ctx.fillStyle='rgba(255,30,70,.075)';for(let i=0;i<N;i+=2){ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,Math.max(W,H),i*6.2832/N,(i+1)*6.2832/N);ctx.fill()}ctx.restore();
+ // gelombang dari bulan
+ ctx.lineWidth=3*DPR;for(let j=0;j<4;j++){const p=((tt*.35+j/4)%1);ctx.globalAlpha=k*(1-p)*.6;ctx.strokeStyle='#ff2a50';ctx.beginPath();ctx.arc(cx,cy,R*.26+p*Math.max(W,H)*.8,0,7);ctx.stroke()}
+ // bulan merah + mangekyo
+ const mr=R*.27*ease(Math.min(1,tt/1.4))*(1+Math.sin(tt*2.2)*.012);ctx.globalAlpha=k;
+ if(mr>1){ctx.save();ctx.translate(cx,cy);ctx.shadowColor='#ff0030';ctx.shadowBlur=90*DPR;let mg=ctx.createRadialGradient(-mr*.3,-mr*.3,mr*.1,0,0,mr);mg.addColorStop(0,'#ff6a7c');mg.addColorStop(.6,'#d4082a');mg.addColorStop(1,'#7a0016');ctx.fillStyle=mg;ctx.beginPath();ctx.arc(0,0,mr,0,7);ctx.fill();ctx.shadowBlur=0;
+  ctx.fillStyle='rgba(60,0,10,.28)';[[.4,.35,.12],[-.45,.2,.09],[.1,-.5,.07],[-.2,.55,.1]].forEach(([a,b,c])=>{ctx.beginPath();ctx.arc(a*mr,b*mr,c*mr,0,7);ctx.fill()});
+  mangekyo(mr*.92,tt*.9*Math.min(1,tt));ctx.restore()}
+ // tetesan darah
+ if(active&&frame%12===0)drips.push({x:rand(0,W),l:0,v:rand(1.5,4)*DPR,w:rand(2,7)*DPR,m:rand(.15,.6)*H,a:1});
+ ctx.lineCap='round';for(let i=drips.length-1;i>=0;i--){const d=drips[i];if(d.l<d.m)d.l+=d.v;else d.a-=.008;ctx.globalAlpha=k*Math.max(0,d.a);ctx.strokeStyle=ctx.fillStyle='#a8001e';ctx.lineWidth=d.w;ctx.beginPath();ctx.moveTo(d.x,0);ctx.lineTo(d.x,d.l);ctx.stroke();ctx.beginPath();ctx.arc(d.x,d.l,d.w*.9,0,7);ctx.fill();if(d.a<=0)drips.splice(i,1)}
+ // gagak
+ if(active&&frame%10===0&&crows.length<70)addCrow();ctx.shadowColor='#ff1838';ctx.shadowBlur=8*DPR;
+ for(let i=crows.length-1;i>=0;i--){drawCrow(crows[i],cx,cy);if(crows[i].life<=0)crows.splice(i,1)}ctx.shadowBlur=0;
+ // bara api
+ if(active)for(let i=0;i<2;i++)parts.push({x:rand(0,W),y:H+10,vx:rand(-.4,.4)*DPR,vy:-rand(1,3.2)*DPR,life:rand(80,160),max:160,r:rand(1,3)*DPR});
+ ctx.restore();
+ // teks
+ ctx.save();ctx.textAlign='center';ctx.globalAlpha=k*clamp((tt-.9)/.8);ctx.fillStyle='#fff';ctx.shadowColor='#ff0030';ctx.shadowBlur=24*DPR;
+ ctx.font=`900 ${R*.075}px Cinzel,serif`;try{ctx.letterSpacing='.2em'}catch(e){}ctx.fillText('TSUKUYOMI',cx,cy+mr*1.42+R*.09);
+ ctx.font=`${R*.045}px serif`;ctx.fillText('月 読',cx,cy+mr*1.42+R*.16);ctx.shadowBlur=0;
+ const s=Math.min(72*3600,Math.floor(tt*3600*8)),hh=String(Math.floor(s/3600)).padStart(2,'0'),mm=String(Math.floor(s%3600/60)).padStart(2,'0'),ss=String(s%60).padStart(2,'0');
+ ctx.textAlign='left';ctx.font=`${12*DPR}px 'Share Tech Mono',monospace`;ctx.fillStyle='#ff8394';ctx.fillText(`ILLUSION ${hh}:${mm}:${ss}${s>=259200?' · TIME FROZEN':''}`,24*DPR,H*.06*k+26*DPR);ctx.restore();
+ ctx.fillStyle='#000';ctx.globalAlpha=1;ctx.fillRect(0,0,W,H*.06*k);ctx.fillRect(0,H-H*.06*k,W,H*.06*k)}
+function eyeFx(now){const e=winkEye;if(!e||(charge<=0&&!active))return;ctx.save();ctx.translate(e.x,e.y);
+ const c=active?1:charge,r=e.r*(1+(1-c)*.9);ctx.globalAlpha=Math.max(c,.0);
+ ctx.strokeStyle='#ff2a4a';ctx.lineWidth=2*DPR;ctx.shadowColor='#ff0030';ctx.shadowBlur=14*DPR;ctx.beginPath();ctx.arc(0,0,r*1.7,-1.5708,-1.5708+c*6.2832);ctx.stroke();
+ for(let i=0;i<4;i++){ctx.save();ctx.rotate(i*1.5708+frame*.01);ctx.beginPath();ctx.moveTo(r*1.9,0);ctx.lineTo(r*2.2,0);ctx.stroke();ctx.restore()}
+ sharingan(r,frame*.05*(1+c*4),c);ctx.restore();
+ if(active){ctx.save();ctx.globalAlpha=k*.45;const gr=ctx.createLinearGradient(e.x,e.y,W/2,H*.42);gr.addColorStop(0,'#ff2a4a');gr.addColorStop(1,'#ff2a4a00');ctx.strokeStyle=gr;ctx.lineWidth=2*DPR;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(W/2+Math.sin(now*.01)*6,H*.42);ctx.stroke();ctx.restore()}}
+function draw(now){const dt=Math.min(.05,(now-last)/1000);last=now;frame++;ctx.clearRect(0,0,W,H);
+ // logika wink: butuh bertahan ±0.3 dtk sebelum memicu
+ const w=winkNow&&now-lastFace<250;charge=w?Math.min(1,charge+dt/.32):Math.max(0,charge-dt/.15);
+ if(!active&&charge>=1)activate();
+ if(active){if(w||now<manualUntil)holdT=now;else if(now-holdT>350)deactivate()}
+ k+=((active?1:0)-k)*Math.min(1,dt*(active?5:3));if(!active&&k<.01)k=0;
+ if(k>0){scene(dt,now);
+  video.style.filter=`grayscale(${k}) invert(${k*.85}) contrast(${1+k*.5}) brightness(${.62+k*.1}) saturate(${.8+k*.4})`;
+  const j=shake*8;video.style.transform=`scaleX(-1) scale(${1+k*.05}) translate(${rand(-j,j)}px,${rand(-j,j)}px)`}
+ else{video.style.filter='';video.style.transform='';crows.length=0;drips.length=0}
+ eyeFx(now);
+ ctx.shadowColor='#ff001f';ctx.shadowBlur=12*DPR;ctx.fillStyle='#ff1838';
+ for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.life--;ctx.globalAlpha=Math.max(0,p.life/p.max)*Math.max(k,.6);ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();if(p.life<=0)parts.splice(i,1)}
+ ctx.globalAlpha=1;ctx.shadowBlur=0;requestAnimationFrame(draw)}
+function activate(){if(active)return;active=true;t0=performance.now();holdT=t0;shake=1;document.body.classList.add('on');$('ui').classList.add('hidden');
+ const f=$('flash');f.classList.remove('go');void f.offsetWidth;f.classList.add('go');
+ for(let i=0;i<40;i++)addCrow();if(winkEye)burst(winkEye.x,winkEye.y,90,9);burst(W/2,H*.42,80,10);sfxOn();if(navigator.vibrate)navigator.vibrate([60,40,120])}
+function deactivate(){if(!active)return;active=false;document.body.classList.remove('on');$('ui').classList.remove('hidden');burst(W/2,H*.42,50,7);sfxOff();toast('TSUKUYOMI RELEASED')}
+function trigger(){manualUntil=performance.now()+4000;audioInit();activate()}
+/* ---------- KONTROL ---------- */
+$('test').onclick=trigger;
+$('recal').onclick=recal;function recal(){eyes.forEach(e=>{e.base=.2;e.open=true});toast('KALIBRASI: BUKA KEDUA MATA LEBAR 2 DETIK')}
+$('sens').oninput=e=>sens=+e.target.value;$('mode').onchange=e=>mode=e.target.value;
+$('mute').onclick=()=>{muted=!muted;$('mute').textContent='SUARA: '+(muted?'OFF':'ON');if(muted)sfxOff()};
+$('capture').onclick=()=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const x=c.getContext('2d'),vw=video.videoWidth||c.width,vh=video.videoHeight||c.height,s=Math.max(c.width/vw,c.height/vh);
+ x.save();x.translate(c.width,0);x.scale(-1,1);x.filter=video.style.filter||'brightness(.62) contrast(1.15) saturate(.8)';x.drawImage(video,(c.width-vw*s)/2,(c.height-vh*s)/2,vw*s,vh*s);x.restore();x.filter='none';x.drawImage(cv,0,0);
+ const a=document.createElement('a');a.download='tsukuyomi-frame.png';a.href=c.toDataURL('image/png');a.click();toast('FRAME SAVED')};
+document.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();trigger()}const q=e.key.toLowerCase();if(q==='r')recal();if(q==='f'){if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.()}});
+$('enable').onclick=async()=>{const b=$('enable');b.disabled=true;b.textContent='MEMUAT MODEL…';audioInit();
+ try{const stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:60},facingMode:'user'},audio:false});video.srcObject=stream;await video.play();
+  if(!window.FaceMesh)throw Error('AI face tracking gagal dimuat. Periksa koneksi internet.');
+  const face=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});face.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:.6,minTrackingConfidence:.6});face.onResults(onFace);await face.initialize();
+  (async function loop(){if(video.readyState>=2){try{await face.send({image:video})}catch(e){}}requestAnimationFrame(loop)})();
+  setLive('EYE SENSOR: ONLINE');const s=$('start');s.style.opacity=0;setTimeout(()=>s.remove(),520);toast('BUKA KEDUA MATA SEBENTAR UNTUK KALIBRASI')}
+ catch(e){b.disabled=false;b.textContent='◉ AKTIFKAN EYE TRACKING';alert('Tidak dapat mengaktifkan kamera: '+e.message+'\n\nJalankan lewat localhost atau HTTPS dan izinkan kamera.')}};
+requestAnimationFrame(draw);
+</script></body></html>
