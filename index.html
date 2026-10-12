@@ -57,7 +57,7 @@ html,body{touch-action:manipulation;-webkit-user-select:none;user-select:none;ov
   <div><div class="logo">月読 <span>TSUKUYOMI</span></div><div class="sub">UCHIHA WINK-TRIGGERED GENJUTSU</div></div>
   <div class="badge"><span class="red">●</span> <span id="live">EYE SENSOR: STANDBY</span>
    <div class="gauge" id="gR"><span>KANAN</span><i><b></b></i></div>
-   <div class="gauge" id="gL"><span>KIRI&nbsp;&nbsp;</span><i><b></b></i></div></div>
+   <div class="gauge" id="gL"><span>KIRI&nbsp;&nbsp;</span><i><b></b></i></div><div id="dbg" style="font-size:9px;color:#8f808b;margin-top:6px">—</div></div>
  </div>
   <div class="bottom">
   <div class="instructions">[ <b>WINK / SATU MATA TERBUKA</b> ] TSUKUYOMI AKTIF<br>[ <b>KEDUA MATA SAMA</b> ] KEMBALI KE REALITAS<br>[ <b>SPACE</b> ] TES MANUAL · [ <b>F</b> ] FULLSCREEN · [ <b>R</b> ] KALIBRASI</div>
@@ -78,7 +78,7 @@ html,body{touch-action:manipulation;-webkit-user-select:none;user-select:none;ov
 const $=id=>document.getElementById(id),video=$('cam'),cv=$('fx'),ctx=cv.getContext('2d');
 const rand=(a,b)=>a+Math.random()*(b-a),ease=x=>1-Math.pow(1-x,3),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 let W,H,DPR=1,frame=0,k=0,active=false,manualUntil=0,holdT=0,charge=0,lastFace=0,winkNow=false,winkEye=null,t0=0,shake=0,last=performance.now();
-let crows=[],parts=[],drips=[],slashes=[],fk=-1,sens=1,mode='any',muted=false,AC,master,drone,faceOK=false;
+let crows=[],parts=[],drips=[],slashes=[],fk=-1,fcnt=0,fT=0,fps=0,sens=1,mode='any',muted=false,AC,master,drone,faceOK=false;
 const eyes=[
  {id:'gR',v:[[159,145],[160,144],[158,153]],w:[33,133],iris:468,s:.3,base:.28,n:1,open:true,x:0,y:0,r:30},
  {id:'gL',v:[[386,374],[387,373],[385,380]],w:[362,263],iris:473,s:.3,base:.28,n:1,open:true,x:0,y:0,r:30}];
@@ -99,16 +99,20 @@ function onFace(res){const now=performance.now(),lm=res.multiFaceLandmarks&&res.
  eyes.forEach(e=>{
   const w=d(lm[e.w[0]],lm[e.w[1]])||1,r=e.v.reduce((a,[u,l])=>a+d(lm[u],lm[l]),0)/e.v.length/w;
   e.s+=(r-e.s)*.55;                                   // haluskan noise
-  if(e.s>e.base)e.base+=(e.s-e.base)*.15;else e.base-=(e.base-e.s)*.0012; // baseline "terbuka" adaptif per mata
+  if(e.s>e.base)e.base+=(e.s-e.base)*.06;else e.base-=(e.base-e.s)*.0012; // baseline "terbuka" adaptif per mata
   e.base=Math.max(e.base,.2);e.n=e.s/e.base;
   e.open=e.open?e.n>lo:e.n>hi;                        // histeresis anti-flicker
   const p=lm[e.iris]?map(lm[e.iris]):map({x:(lm[e.v[0][0]].x+lm[e.v[0][1]].x)/2,y:(lm[e.v[0][0]].y+lm[e.v[0][1]].y)/2}),a=map(lm[e.w[0]]),b=map(lm[e.w[1]]);
   e.x+=(p.x-e.x)*.5;e.y+=(p.y-e.y)*.5;e.r=Math.max(Math.abs(a.x-b.x)*.55,14*DPR);
   const g=$(e.id);g.classList.toggle('open',e.open);g.querySelector('b').style.width=clamp(e.n/1.1)*100+'%'});
- const [R,L]=eyes,oneOpen=R.open!==L.open&&Math.abs(R.n-L.n)>.22;
- let ok=oneOpen;if(ok&&mode!=='any')ok=eyes[+mode].open;
- winkNow=ok;if(ok)winkEye=R.open?R:L;
- setLive(ok?`WINK · MATA ${winkEye===R?'KANAN':'KIRI'} TERBUKA`:R.open&&L.open?'KEDUA MATA TERBUKA':!R.open&&!L.open?'KEDUA MATA TERTUTUP':'WINK TIDAK SESUAI MODE')}
+ const [R,L]=eyes,big=R.n>=L.n?R:L,sm=big===R?L:R;
+ // wink = satu mata jauh lebih kecil dari mata satunya, sementara mata besar masih terbuka
+ const wk=big.n>.62&&sm.n<big.n*Math.min(.85,.68*sens)&&big.n-sm.n>.18/sens;
+ let ok=wk;if(ok&&mode!=='any')ok=big===eyes[+mode];
+ fcnt++;if(now-fT>1000){fps=fcnt;fcnt=0;fT=now}
+ $('dbg').textContent=`R ${R.n.toFixed(2)} · L ${L.n.toFixed(2)} · ${fps}fps`;
+ winkNow=ok;if(ok)winkEye=big;
+ setLive(ok?`WINK · MATA ${big===R?'KANAN':'KIRI'} TERBUKA`:wk?'WINK TIDAK SESUAI MODE':big.n>.62?'KEDUA MATA TERBUKA':'KEDUA MATA TERTUTUP')}
 /* ---------- GAMBAR ---------- */
 function sharingan(r,rot,a=1){ctx.save();ctx.globalAlpha*=a;ctx.rotate(rot);const g=ctx.createRadialGradient(0,0,r*.1,0,0,r);g.addColorStop(0,'#ff5063');g.addColorStop(1,'#a00018');
  ctx.shadowColor='#ff0030';ctx.shadowBlur=r*.7;ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();ctx.shadowBlur=0;
@@ -166,9 +170,9 @@ function eyeFx(now){const e=winkEye;if(!e||(charge<=0&&!active))return;ctx.save(
  if(active){ctx.save();ctx.globalAlpha=k*.45;const gr=ctx.createLinearGradient(e.x,e.y,W/2,H*.42);gr.addColorStop(0,'#ff2a4a');gr.addColorStop(1,'#ff2a4a00');ctx.strokeStyle=gr;ctx.lineWidth=2*DPR;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(W/2+Math.sin(now*.01)*6,H*.42);ctx.stroke();ctx.restore()}}
 function draw(now){const dt=Math.min(.05,(now-last)/1000);last=now;frame++;ctx.clearRect(0,0,W,H);
  // logika wink: butuh bertahan ±0.3 dtk sebelum memicu
- const w=winkNow&&now-lastFace<250;charge=w?Math.min(1,charge+dt/.32):Math.max(0,charge-dt/.15);
+ const w=winkNow&&now-lastFace<700;charge=w?Math.min(1,charge+dt/.22):Math.max(0,charge-dt/.4);
  if(!active&&charge>=1)activate();
- if(active){if(w||now<manualUntil)holdT=now;else if(now-holdT>350)deactivate()}
+ if(active){if(w||now<manualUntil)holdT=now;else if(now-holdT>500)deactivate()}
  k+=((active?1:0)-k)*Math.min(1,dt*(active?5:3));if(!active&&k<.01)k=0;
  if(k>0){scene(dt,now);
   const kk=Math.round(k*20);if(kk!==fk){fk=kk;video.style.filter=`grayscale(${k}) invert(${k*.85}) contrast(${1+k*.5}) brightness(${.62+k*.1}) saturate(${.8+k*.4})`}
@@ -195,7 +199,7 @@ document.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();
 $('enable').onclick=async()=>{const b=$('enable');b.disabled=true;b.textContent='MEMUAT MODEL…';audioInit();
  try{const stream=await navigator.mediaDevices.getUserMedia({video:MOB?{facingMode:'user',width:{ideal:640},height:{ideal:480},frameRate:{ideal:30}}:{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:60},facingMode:'user'},audio:false});video.srcObject=stream;await video.play();
   if(!window.FaceMesh)throw Error('AI face tracking gagal dimuat. Periksa koneksi internet.');
-  const face=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});face.setOptions({maxNumFaces:1,refineLandmarks:!MOB,minDetectionConfidence:.6,minTrackingConfidence:.6});face.onResults(onFace);await face.initialize();
+  const face=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});face.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:.5,minTrackingConfidence:.5});face.onResults(onFace);await face.initialize();
   (async function loop(){if(video.readyState>=2){try{await face.send({image:video})}catch(e){}}requestAnimationFrame(loop)})();
   try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}setLive('EYE SENSOR: ONLINE');const s=$('start');s.style.opacity=0;setTimeout(()=>s.remove(),520);toast('BUKA KEDUA MATA SEBENTAR UNTUK KALIBRASI')}
  catch(e){b.disabled=false;b.textContent='◉ AKTIFKAN EYE TRACKING';alert('Tidak dapat mengaktifkan kamera: '+e.message+'\n\nJalankan lewat localhost atau HTTPS dan izinkan kamera.')}};
