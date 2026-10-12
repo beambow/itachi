@@ -49,6 +49,11 @@ html,body{touch-action:manipulation;-webkit-user-select:none;user-select:none;ov
  .controls.show{display:flex}
  button,select{min-height:44px;font-size:12px}input[type=range]{width:100%;height:28px}.badge{min-width:0;font-size:9px}
 }
+#pill{position:fixed;z-index:9;top:calc(max(12px,env(safe-area-inset-top)) + 64px);left:50%;transform:translateX(-50%);display:none;font:11px 'Share Tech Mono',monospace;letter-spacing:.1em;padding:12px 16px;min-height:44px;border:1px solid #ff1738;background:#09030bf0;color:#fff;cursor:pointer;white-space:nowrap}
+#pill.rec{animation:blink 1.2s infinite}#pill.save{background:#ff1738;color:#160108;font-weight:bold}@keyframes blink{50%{border-color:#ff173800}}
+#guide{position:fixed;z-index:9;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);display:none;width:min(92vw,420px);text-align:center;font:12px/1.7 'Share Tech Mono',monospace;letter-spacing:.06em;padding:14px 16px;border:1px solid #ff1738;background:#09030bf5;cursor:pointer}
+#guide b{color:#ff566d;font-weight:400}#guide i{display:block;height:3px;background:#ff1738;width:0;margin-top:8px;transition:width .15s}
+@media(max-width:700px),(pointer:coarse){.controls{max-height:62vh;overflow:auto}}
 </style></head>
 <body>
 <video id="cam" autoplay playsinline muted></video><canvas id="fx"></canvas><div id="vignette"></div><div id="scan"></div><div id="flash"></div>
@@ -60,25 +65,25 @@ html,body{touch-action:manipulation;-webkit-user-select:none;user-select:none;ov
    <div class="gauge" id="gL"><span>KIRI&nbsp;&nbsp;</span><i><b></b></i></div><div id="dbg" style="font-size:9px;color:#8f808b;margin-top:6px">—</div></div>
  </div>
   <div class="bottom">
-  <div class="instructions">[ <b>WINK / SATU MATA TERBUKA</b> ] TSUKUYOMI AKTIF<br>[ <b>KEDUA MATA SAMA</b> ] KEMBALI KE REALITAS<br>[ <b>SPACE</b> ] TES MANUAL · [ <b>F</b> ] FULLSCREEN · [ <b>R</b> ] KALIBRASI</div>
+  <div class="instructions">[ <b>KIRI TERBUKA</b> ] TSUKUYOMI · [ <b>KANAN TERBUKA</b> ] AMATERASU<br>[ <b>KEDUA MATA SAMA</b> ] KEMBALI KE REALITAS<br>[ <b>SPACE</b> ] TES · [ <b>F</b> ] FULLSCREEN · [ <b>R</b> ] KALIBRASI</div>
   <button id="menuBtn">⚙ MENU</button><div class="controls" id="ctrls">
    <label class="sl">SENSITIVITAS<input type="range" id="sens" min="0.8" max="1.25" step="0.01" value="1"></label>
-   <select id="mode" aria-label="Mata pemicu"><option value="any">MATA MANA SAJA</option><option value="0">HANYA KANAN TERBUKA</option><option value="1">HANYA KIRI TERBUKA</option></select>
-   <button id="recal">KALIBRASI</button><button id="mute">SUARA: ON</button><button id="test">TEST</button><button id="capture">✦ CAPTURE</button><button id="fs">FULLSCREEN</button>
+   <select id="mode" aria-label="Pemetaan mata"><option value="0">KIRI=TSUKUYOMI · KANAN=AMATERASU</option><option value="1">KANAN=TSUKUYOMI · KIRI=AMATERASU</option></select>
+   <button id="recal">KALIBRASI</button><button id="rec1">● REKAM</button><button id="auto">AUTO REKAM: OFF</button><button id="mute">SUARA: ON</button><button id="test">TEST 月読</button><button id="test2">TEST 天照</button><button id="capture">✦ CAPTURE</button><button id="fs">FULLSCREEN</button>
   </div>
  </div>
 </div>
 <div id="start"><div class="box"><div class="kicker">UCHIHA CLAN · FORBIDDEN TECHNIQUE</div><h2>THE EYE<br>THAT <span>TRAPS</span><br>REALITY.</h2>
-<p>Webcam memantau kedua mata secara terpisah. Saat hanya satu mata yang terbuka, Sharingan terkunci di mata itu, lalu Tsukuyomi menelan layar: bulan merah, gagak, dan dunia yang terbalik. Berkedip dengan kedua mata tidak memicu apa-apa.</p>
+<p>Webcam memantau kedua mata secara terpisah. Mata kiri terbuka (kanan tertutup) memanggil Tsukuyomi: bulan merah, gagak, dunia terbalik. Mata kanan terbuka memanggil Amaterasu: api hitam yang tak padam. Berkedip dengan kedua mata tidak memicu apa-apa.</p>
 <button class="primary" id="enable">◉ AKTIFKAN EYE TRACKING</button>
 <div class="fine">Chrome / Safari lewat HTTPS (atau localhost di PC) · Perlu internet untuk model face landmarks<br>Video diproses di browser · Pastikan wajah terang dan menghadap kamera</div></div></div>
-<div id="statusToast"></div>
+<div id="pill"></div><div id="guide"></div><div id="statusToast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
 <script>
 const $=id=>document.getElementById(id),video=$('cam'),cv=$('fx'),ctx=cv.getContext('2d');
 const rand=(a,b)=>a+Math.random()*(b-a),ease=x=>1-Math.pow(1-x,3),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 let W,H,DPR=1,frame=0,k=0,active=false,manualUntil=0,holdT=0,charge=0,lastFace=0,winkNow=false,winkEye=null,t0=0,shake=0,last=performance.now();
-let crows=[],parts=[],drips=[],slashes=[],fk=-1,fcnt=0,fT=0,fps=0,sens=1,mode='any',muted=false,AC,master,drone,faceOK=false;
+let crows=[],parts=[],drips=[],slashes=[],fk=-1,fcnt=0,fT=0,fps=0,sens=1,mode='0',tech='tsu',hb=0,pch=0,camOn=false,muted=false,AC,master,drone,faceOK=false;
 const eyes=[
  {id:'gR',v:[[159,145],[160,144],[158,153]],w:[33,133],iris:468,s:.3,base:.28,n:1,open:true,x:0,y:0,r:30},
  {id:'gL',v:[[386,374],[387,373],[385,380]],w:[362,263],iris:473,s:.3,base:.28,n:1,open:true,x:0,y:0,r:30}];
@@ -87,10 +92,26 @@ function resize(){DPR=Math.min(devicePixelRatio||1,MOB?1.5:2);W=cv.width=innerWi
 function toast(s){const t=$('statusToast');t.textContent=s;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,1400)}
 function setLive(s){$('live').textContent=s}
 /* ---------- AUDIO (sintesis WebAudio, tanpa file) ---------- */
-function audioInit(){try{if(!AC){AC=new(window.AudioContext||webkitAudioContext)();master=AC.createGain();master.gain.value=.6;master.connect(AC.destination)}AC.resume()}catch(e){}}
-function sfxOn(){if(muted||!AC)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(28,t+1.3);g.gain.setValueAtTime(.95,t);g.gain.exponentialRampToValueAtTime(.001,t+1.8);o.connect(g).connect(master);o.start(t);o.stop(t+1.9);
- const d1=AC.createOscillator(),d2=AC.createOscillator(),f=AC.createBiquadFilter(),dg=AC.createGain();d1.type=d2.type='sawtooth';d1.frequency.value=55;d2.frequency.value=55.8;f.type='lowpass';f.frequency.value=240;dg.gain.setValueAtTime(0,t);dg.gain.linearRampToValueAtTime(.16,t+1.6);d1.connect(f);d2.connect(f);f.connect(dg).connect(master);d1.start();d2.start();drone={d1,d2,dg}}
-function sfxOff(){if(!drone||!AC)return;const t=AC.currentTime,d=drone;d.dg.gain.cancelScheduledValues(t);d.dg.gain.setValueAtTime(d.dg.gain.value,t);d.dg.gain.linearRampToValueAtTime(0,t+.5);d.d1.stop(t+.6);d.d2.stop(t+.6);drone=null}
+let adest,rv,nb,tm=[];
+function audioInit(){try{if(!AC){AC=new(window.AudioContext||webkitAudioContext)();master=AC.createGain();master.gain.value=.65;master.connect(AC.destination);adest=AC.createMediaStreamDestination();master.connect(adest);
+ const n=AC.sampleRate*2,b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;nb=b;
+ const il=Math.floor(AC.sampleRate*2.2),ib=AC.createBuffer(2,il,AC.sampleRate);for(let c=0;c<2;c++){const x=ib.getChannelData(c);for(let i=0;i<il;i++)x[i]=(Math.random()*2-1)*Math.pow(1-i/il,2.6)}
+ rv=AC.createConvolver();rv.buffer=ib;const rg=AC.createGain();rg.gain.value=.4;rv.connect(rg);rg.connect(master)}AC.resume()}catch(e){}}
+const bus=n=>{n.connect(master);if(rv)n.connect(rv)},aok=()=>AC&&!muted;
+function nz(dur,type,f0,f1,g,t){t=t||AC.currentTime;const s=AC.createBufferSource(),f=AC.createBiquadFilter(),gn=AC.createGain();s.buffer=nb;s.loop=true;f.type=type;f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(f1,t+dur);f.Q.value=type==='bandpass'?4:.8;
+ gn.gain.setValueAtTime(.0001,t);gn.gain.linearRampToValueAtTime(g,t+Math.min(.04,dur*.3));gn.gain.exponentialRampToValueAtTime(.001,t+dur);s.connect(f);f.connect(gn);bus(gn);s.start(t);s.stop(t+dur+.05)}
+function tone(type,f0,f1,dur,g,t){t=t||AC.currentTime;const o=AC.createOscillator(),gn=AC.createGain();o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f1,t+dur);gn.gain.setValueAtTime(g,t);gn.gain.exponentialRampToValueAtTime(.001,t+dur);o.connect(gn);bus(gn);o.start(t);o.stop(t+dur+.05)}
+function sfxSwish(){if(aok())nz(.28,'highpass',5000,700,.22)}
+function sfxCaw(){if(!aok())return;const t=AC.currentTime,f=rand(900,1500);nz(.22,'bandpass',f,f*.6,.3,t);nz(.14,'bandpass',f*1.3,f*.7,.18,t+.2)}
+function sfxBeat(c){if(!aok())return;tone('sine',70,38,.18,.5*c+.2);tone('sine',60,34,.16,.35*c+.15,AC.currentTime+.13)}
+function sfxRise(){if(aok())tone('triangle',160,720,.5,.07)}
+function sfxLock(){if(aok()){tone('sine',320,1400,.35,.12);nz(.35,'bandpass',500,4000,.08)}}
+function sfxOn(t){if(!aok())return;const T=AC.currentTime;tone('sine',150,28,1.3,.9);nz(1.2,'lowpass',2500,120,.5);
+ if(t==='tsu'){const d1=AC.createOscillator(),d2=AC.createOscillator(),f=AC.createBiquadFilter(),dg=AC.createGain();d1.type=d2.type='sawtooth';d1.frequency.value=55;d2.frequency.value=55.8;f.type='lowpass';f.frequency.value=240;dg.gain.setValueAtTime(0,T);dg.gain.linearRampToValueAtTime(.16,T+1.6);d1.connect(f);d2.connect(f);f.connect(dg);bus(dg);d1.start();d2.start();drone={d1,d2,dg};
+  tone('sine',196,192,3.5,.16);tone('sine',396,384,3,.07);for(let i=0;i<4;i++)setTimeout(sfxCaw,i*180+rand(0,120));tm.push(setInterval(()=>{if(Math.random()<.7)sfxCaw()},900))}
+ else{nz(1.6,'lowpass',200,3000,.35);const s=AC.createBufferSource(),f=AC.createBiquadFilter(),gn=AC.createGain();s.buffer=nb;s.loop=true;f.type='lowpass';f.frequency.value=420;gn.gain.setValueAtTime(0,T);gn.gain.linearRampToValueAtTime(.2,T+1.2);s.connect(f);f.connect(gn);bus(gn);s.start();drone={s,dg:gn};
+  tm.push(setInterval(()=>{if(aok())nz(.05,'highpass',rand(2500,6000),1500,rand(.04,.16))},65))}}
+function sfxOff(){tm.forEach(clearInterval);tm=[];if(!AC)return;const t=AC.currentTime;if(drone){const d=drone;d.dg.gain.cancelScheduledValues(t);d.dg.gain.setValueAtTime(d.dg.gain.value,t);d.dg.gain.linearRampToValueAtTime(0,t+.5);(d.d1?[d.d1,d.d2]:[d.s]).forEach(o=>o.stop(t+.6));drone=null}if(!muted){tone('sine',420,60,.7,.25);nz(.7,'bandpass',3000,300,.15)}}
 /* ---------- DETEKSI MATA ---------- */
 function map(p){const vw=video.videoWidth||1280,vh=video.videoHeight||720,s=Math.max(W/vw,H/vh);return{x:W-(p.x*vw*s+(W-vw*s)/2),y:p.y*vh*s+(H-vh*s)/2}}
 function onFace(res){const now=performance.now(),lm=res.multiFaceLandmarks&&res.multiFaceLandmarks[0];
@@ -100,15 +121,15 @@ function onFace(res){const now=performance.now(),lm=res.multiFaceLandmarks&&res.
   const w=d(lm[e.w[0]],lm[e.w[1]])||1,r=e.v.reduce((a,[u,l])=>a+d(lm[u],lm[l]),0)/e.v.length/w;
   e.s+=(r-e.s)*.55;                                   // haluskan noise
   if(e.s>e.base)e.base+=(e.s-e.base)*.06;else e.base-=(e.base-e.s)*.0012; // baseline "terbuka" adaptif per mata
-  e.base=Math.max(e.base,.2);e.n=e.s/e.base;
+  e.base=Math.max(e.base,.2);e.n=e.cal?clamp((e.s-e.cl)/((e.op-e.cl)||.01),0,1.3):e.s/e.base;
   e.open=e.open?e.n>lo:e.n>hi;                        // histeresis anti-flicker
   const p=lm[e.iris]?map(lm[e.iris]):map({x:(lm[e.v[0][0]].x+lm[e.v[0][1]].x)/2,y:(lm[e.v[0][0]].y+lm[e.v[0][1]].y)/2}),a=map(lm[e.w[0]]),b=map(lm[e.w[1]]);
   e.x+=(p.x-e.x)*.5;e.y+=(p.y-e.y)*.5;e.r=Math.max(Math.abs(a.x-b.x)*.55,14*DPR);
   const g=$(e.id);g.classList.toggle('open',e.open);g.querySelector('b').style.width=clamp(e.n/1.1)*100+'%'});
  const [R,L]=eyes,big=R.n>=L.n?R:L,sm=big===R?L:R;
  // wink = satu mata jauh lebih kecil dari mata satunya, sementara mata besar masih terbuka
- const wk=big.n>.62&&sm.n<big.n*Math.min(.85,.68*sens)&&big.n-sm.n>.18/sens;
- let ok=wk;if(ok&&mode!=='any')ok=big===eyes[+mode];
+ const ca=eyes[0].cal&&eyes[1].cal,wk=ca?(big.n>.55&&sm.n<Math.min(.75,.5*sens)&&big.n-sm.n>.25/sens):(big.n>.62&&sm.n<big.n*Math.min(.85,.68*sens)&&big.n-sm.n>.18/sens);
+ calRun(now);let ok=wk&&!calStep;
  fcnt++;if(now-fT>1000){fps=fcnt;fcnt=0;fT=now}
  $('dbg').textContent=`R ${R.n.toFixed(2)} · L ${L.n.toFixed(2)} · ${fps}fps`;
  winkNow=ok;if(ok)winkEye=big;
@@ -149,7 +170,7 @@ function scene(dt,now){
  if(active&&frame%12===0)drips.push({x:rand(0,W),l:0,v:rand(1.5,4)*DPR,w:rand(2,7)*DPR,m:rand(.15,.6)*H,a:1});
  ctx.lineCap='round';for(let i=drips.length-1;i>=0;i--){const d=drips[i];if(d.l<d.m)d.l+=d.v;else d.a-=.008;ctx.globalAlpha=k*Math.max(0,d.a);ctx.strokeStyle=ctx.fillStyle='#a8001e';ctx.lineWidth=d.w;ctx.beginPath();ctx.moveTo(d.x,0);ctx.lineTo(d.x,d.l);ctx.stroke();ctx.beginPath();ctx.arc(d.x,d.l,d.w*.9,0,7);ctx.fill();if(d.a<=0)drips.splice(i,1)}
  // tebasan pedang
- if(active&&Math.random()<dt*.45){slashes.push({x:rand(.1,.9)*W,y:rand(.1,.9)*H,g:rand(-.8,.8),a:1});shake=Math.max(shake,.35)}
+ if(active&&Math.random()<dt*.45){slashes.push({x:rand(.1,.9)*W,y:rand(.1,.9)*H,g:rand(-.8,.8),a:1});shake=Math.max(shake,.35);sfxSwish()}
  for(let i=slashes.length-1;i>=0;i--){const q=slashes[i];q.a-=dt*3;if(q.a<=0){slashes.splice(i,1);continue}ctx.save();ctx.globalAlpha=k*q.a;ctx.translate(q.x,q.y);ctx.rotate(q.g);ctx.strokeStyle='#fff';ctx.shadowColor='#ff0030';ctx.shadowBlur=MOB?6:20*DPR;ctx.lineWidth=(1+q.a*4)*DPR;ctx.beginPath();ctx.moveTo(-W,0);ctx.lineTo(W,0);ctx.stroke();ctx.restore()}
  // gagak
  if(active&&frame%10===0&&crows.length<(MOB?38:70))addCrow();ctx.shadowColor='#ff1838';ctx.shadowBlur=MOB?0:8*DPR;
@@ -163,33 +184,84 @@ function scene(dt,now){
  ctx.fillStyle='#000';ctx.globalAlpha=1;ctx.fillRect(0,0,W,H*.06*k);ctx.fillRect(0,H-H*.06*k,W,H*.06*k)}
 function eyeFx(now){const e=winkEye;if(!e||(charge<=0&&!active))return;ctx.save();ctx.translate(e.x,e.y);
  const c=active?1:charge,r=e.r*(1+(1-c)*.9);ctx.globalAlpha=Math.max(c,.0);
- ctx.strokeStyle='#ff2a4a';ctx.lineWidth=2*DPR;ctx.shadowColor='#ff0030';ctx.shadowBlur=14*DPR;ctx.beginPath();ctx.arc(0,0,r*1.7,-1.5708,-1.5708+c*6.2832);ctx.stroke();
+ const tk=active?tech:techOf(e);ctx.strokeStyle=tk==='ama'?'#ff9a2a':'#ff2a4a';ctx.lineWidth=2*DPR;ctx.shadowColor=tk==='ama'?'#ff6a00':'#ff0030';ctx.shadowBlur=14*DPR;ctx.beginPath();ctx.arc(0,0,r*1.7,-1.5708,-1.5708+c*6.2832);ctx.stroke();
  for(let i=0;i<4;i++){ctx.save();ctx.rotate(i*1.5708+frame*.01);ctx.beginPath();ctx.moveTo(r*1.9,0);ctx.lineTo(r*2.2,0);ctx.stroke();ctx.restore()}
  if(active){const g2=ctx.createRadialGradient(0,0,r*.1,0,0,r);g2.addColorStop(0,'#ff5063');g2.addColorStop(1,'#b00018');ctx.shadowColor='#ff0030';ctx.shadowBlur=r*.8;ctx.fillStyle=g2;ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();ctx.shadowBlur=0;mangekyo(r*.96,frame*.06)}else sharingan(r,frame*.05*(1+c*4),c);ctx.restore();
  if(active){const L=Math.min(1,(now-t0)/2200)*Math.min(W,H)*.3,x0=e.x,y0=e.y+e.r*.7;ctx.save();ctx.globalAlpha=k;const bg=ctx.createLinearGradient(0,y0,0,y0+L+1);bg.addColorStop(0,'#d0001f');bg.addColorStop(1,'#5a000e');ctx.strokeStyle=ctx.fillStyle=bg;ctx.lineCap='round';ctx.lineWidth=Math.max(2,e.r*.14);ctx.beginPath();ctx.moveTo(x0,y0);for(let y=8*DPR;y<=L;y+=8*DPR)ctx.lineTo(x0+Math.sin(y*.03+now*.002)*e.r*.04,y0+y);ctx.stroke();ctx.beginPath();ctx.arc(x0,y0+L,ctx.lineWidth*.9,0,7);ctx.fill();ctx.restore()}
- if(active){ctx.save();ctx.globalAlpha=k*.45;const gr=ctx.createLinearGradient(e.x,e.y,W/2,H*.42);gr.addColorStop(0,'#ff2a4a');gr.addColorStop(1,'#ff2a4a00');ctx.strokeStyle=gr;ctx.lineWidth=2*DPR;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(W/2+Math.sin(now*.01)*6,H*.42);ctx.stroke();ctx.restore()}}
+ if(active&&tech==='tsu'){ctx.save();ctx.globalAlpha=k*.45;const gr=ctx.createLinearGradient(e.x,e.y,W/2,H*.42);gr.addColorStop(0,'#ff2a4a');gr.addColorStop(1,'#ff2a4a00');ctx.strokeStyle=gr;ctx.lineWidth=2*DPR;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(W/2+Math.sin(now*.01)*6,H*.42);ctx.stroke();ctx.restore()}}
 function draw(now){const dt=Math.min(.05,(now-last)/1000);last=now;frame++;ctx.clearRect(0,0,W,H);
  // logika wink: butuh bertahan ±0.3 dtk sebelum memicu
- const w=winkNow&&now-lastFace<700;charge=w?Math.min(1,charge+dt/.22):Math.max(0,charge-dt/.4);
- if(!active&&charge>=1)activate();
+ const w=winkNow&&now-lastFace<700;charge=w?Math.min(1,charge+dt/.22):Math.max(0,charge-dt/.4);if(charge>0&&!active){if(now-hb>750-500*charge){hb=now;sfxBeat(charge)}if(pch===0)sfxRise()}pch=charge;
+ if(!active&&charge>=1)activate(winkEye?techOf(winkEye):'tsu');
  if(active){if(w||now<manualUntil)holdT=now;else if(now-holdT>500)deactivate()}
  k+=((active?1:0)-k)*Math.min(1,dt*(active?5:3));if(!active&&k<.01)k=0;
- if(k>0){scene(dt,now);
-  const kk=Math.round(k*20);if(kk!==fk){fk=kk;video.style.filter=`grayscale(${k}) invert(${k*.85}) contrast(${1+k*.5}) brightness(${.62+k*.1}) saturate(${.8+k*.4})`}
+ if(k>0){tech==='ama'?sceneAma(dt,now):scene(dt,now);
+  const kk=Math.round(k*20);if(kk!==fk){fk=kk;video.style.filter=vf()}
   const j=shake*8;video.style.transform=`scaleX(-1) scale(${1+k*.05}) translate(${rand(-j,j)}px,${rand(-j,j)}px)`}
  else{video.style.filter='';video.style.transform='';crows.length=0;drips.length=0;slashes.length=0;fk=-1}
  eyeFx(now);
  ctx.shadowColor='#ff001f';ctx.shadowBlur=(MOB?5:12)*DPR;
  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.life--;if(p.c)p.r*=.985;ctx.globalAlpha=Math.max(0,p.life/p.max)*Math.max(k,.6);ctx.fillStyle=p.c||'#ff1838';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();if(p.life<=0)parts.splice(i,1)}
+ if(rec&&(!MOB||frame%2===0)){recFrame();if(frame%30===0)updPill()}
  ctx.globalAlpha=1;ctx.shadowBlur=0;requestAnimationFrame(draw)}
-function activate(){if(active)return;active=true;t0=performance.now();holdT=t0;shake=1;document.body.classList.add('on');$('ui').classList.add('hidden');
+function activate(t){if(active)return;tech=t||'tsu';active=true;t0=performance.now();holdT=t0;shake=1;document.body.classList.add('on');$('ui').classList.add('hidden');
  const f=$('flash');f.classList.remove('go');void f.offsetWidth;f.classList.add('go');
- for(let i=0;i<(MOB?26:40);i++)addCrow(winkEye?winkEye.x:W/2,winkEye?winkEye.y:H*.42);$('ctrls').classList.remove('show');if(winkEye)burst(winkEye.x,winkEye.y,90,9);burst(W/2,H*.42,80,10);sfxOn();if(navigator.vibrate)navigator.vibrate([60,40,120])}
-function deactivate(){if(!active)return;active=false;document.body.classList.remove('on');$('ui').classList.remove('hidden');burst(W/2,H*.42,50,7);sfxOff();toast('TSUKUYOMI RELEASED')}
-function trigger(){manualUntil=performance.now()+4000;audioInit();activate()}
+ if(tech==='tsu')for(let i=0;i<(MOB?26:40);i++)addCrow(winkEye?winkEye.x:W/2,winkEye?winkEye.y:H*.42);$('ctrls').classList.remove('show');if(winkEye)burst(winkEye.x,winkEye.y,90,9);burst(W/2,H*.42,80,10);sfxOn(tech);if(recAuto&&!rec)startRec(true);if(navigator.vibrate)navigator.vibrate([60,40,120])}
+function deactivate(){if(!active)return;active=false;document.body.classList.remove('on');$('ui').classList.remove('hidden');burst(W/2,H*.42,50,7);sfxOff();if(rec&&autoStarted)setTimeout(()=>{if(!active)stopRec()},1500);toast(tech==='ama'?'AMATERASU RELEASED':'TSUKUYOMI RELEASED')}
+function trigger(t){manualUntil=performance.now()+4000;audioInit();activate(t||'tsu')}
+/* ---------- TEKNIK PER MATA ---------- */
+const techOf=e=>((e===eyes[1])===(mode==='0'))?'tsu':'ama';
+function vf(){return tech==='ama'?`grayscale(${k}) contrast(${1+k*.7}) brightness(${.62-k*.18}) sepia(${k*.4}) hue-rotate(-20deg)`:`grayscale(${k}) invert(${k*.85}) contrast(${1+k*.5}) brightness(${.62+k*.1}) saturate(${.8+k*.4})`}
+function sceneAma(dt,now){
+ const R=Math.min(W,H),tt=(now-t0)/1000,e=winkEye||{x:W/2,y:H*.42},front=ease(Math.min(1,tt/2.4))*Math.max(W,H)*1.2;
+ ctx.save();if(shake>0){ctx.translate(rand(-1,1)*shake*12*DPR,rand(-1,1)*shake*12*DPR);shake=Math.max(0,shake-dt*1.5)}
+ ctx.globalAlpha=k;const g=ctx.createRadialGradient(e.x,e.y,R*.05,e.x,e.y,Math.max(W,H));g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(.5,'rgba(18,0,4,.5)');g.addColorStop(1,'rgba(0,0,0,.92)');ctx.fillStyle=g;ctx.fillRect(-60,-60,W+120,H+120);
+ ctx.globalAlpha=k*.6;ctx.fillStyle='#030001';ctx.beginPath();ctx.arc(e.x,e.y,front,0,7);ctx.fill();
+ ctx.globalAlpha=k;ctx.shadowColor='#ff3a10';ctx.shadowBlur=(MOB?6:18)*DPR;ctx.fillStyle='#030001';
+ const N=MOB?34:60,u=R*.14;
+ for(let i=0;i<N;i++){const a=i/N*6.2832+Math.sin(tt*.8+i)*.02,h=u*(.55+.45*Math.sin(tt*7+i*1.9)),w=R*.045,bx=e.x+Math.cos(a)*front,by=e.y+Math.sin(a)*front,tx=bx+Math.cos(a)*h*.5,ty=by+Math.sin(a)*h*.5-h*.9,sx=-Math.sin(a)*w,sy=Math.cos(a)*w;
+  ctx.beginPath();ctx.moveTo(bx+sx,by+sy);ctx.quadraticCurveTo(bx+sx*.4,by-h*.5,tx,ty);ctx.quadraticCurveTo(bx-sx*.4,by-h*.4,bx-sx,by-sy);ctx.closePath();ctx.fill()}
+ ctx.shadowBlur=0;ctx.lineWidth=3*DPR;ctx.strokeStyle='#ff4a1a';ctx.globalAlpha=k*.55;ctx.beginPath();ctx.arc(e.x,e.y,front*.985,0,7);ctx.stroke();
+ ctx.restore();
+ if(active&&parts.length<(MOB?260:480))for(let i=0;i<(MOB?3:6);i++){const x=rand(0,W),y=rand(0,H);if(Math.hypot(x-e.x,y-e.y)<front)parts.push({x,y,vx:rand(-.6,.6)*DPR,vy:-rand(1.2,3.6)*DPR,life:rand(40,80),max:80,r:rand(10,26)*DPR,c:'#050002'})}
+ ctx.fillStyle='#000';ctx.globalAlpha=1;ctx.fillRect(0,0,W,H*.05*k);ctx.fillRect(0,H-H*.05*k,W,H*.05*k)}
+/* ---------- REKAM VIDEO ---------- */
+const rc=document.createElement('canvas'),rx=rc.getContext('2d');let rec=null,rch=[],recAuto=false,recAt=0,recBlob=null,recExt='webm',autoStarted=false;
+const RF=(()=>{try{return'filter'in rx}catch(e){return false}})();
+function recFrame(){const sc=Math.min(1,(MOB?720:1280)/Math.max(cv.width,cv.height)),w=Math.round(cv.width*sc),h=Math.round(cv.height*sc);if(rc.width!==w||rc.height!==h){rc.width=w;rc.height=h}
+ const vw=video.videoWidth||w,vh=video.videoHeight||h,s=Math.max(w/vw,h/vh);rx.save();rx.translate(w,0);rx.scale(-1,1);if(RF)rx.filter=video.style.filter||'brightness(.62) contrast(1.15) saturate(.8)';rx.drawImage(video,(w-vw*s)/2,(h-vh*s)/2,vw*s,vh*s);rx.restore();rx.drawImage(cv,0,0,w,h)}
+function startRec(auto){if(rec)return;if(!window.MediaRecorder||!rc.captureStream)return toast('REKAM TIDAK DIDUKUNG BROWSER INI');audioInit();recFrame();
+ const st=rc.captureStream(30);if(adest)adest.stream.getAudioTracks().forEach(t=>st.addTrack(t));
+ const types=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'],mt=types.find(t=>MediaRecorder.isTypeSupported(t))||'';
+ try{rec=new MediaRecorder(st,mt?{mimeType:mt,videoBitsPerSecond:MOB?3e6:6e6}:{})}catch(e){rec=null;return toast('REKAM GAGAL')}
+ recExt=(rec.mimeType||mt).includes('mp4')?'mp4':'webm';rch=[];autoStarted=!!auto;
+ rec.ondataavailable=e=>{if(e.data&&e.data.size)rch.push(e.data)};
+ rec.onstop=()=>{recBlob=new Blob(rch,{type:rec.mimeType||mt||'video/webm'});rec=null;showPill('save')};
+ rec.start(500);recAt=performance.now();$('rec1').textContent='■ STOP REKAM';showPill('rec')}
+function stopRec(){if(rec&&rec.state!=='inactive')rec.stop();$('rec1').textContent='● REKAM'}
+function showPill(m){const p=$('pill');p.dataset.m=m;p.style.display='block';updPill()}
+function updPill(){const p=$('pill');if(p.dataset.m==='rec'){const t=Math.floor((performance.now()-recAt)/1000);p.textContent=`● REC ${Math.floor(t/60)}:${String(t%60).padStart(2,'0')} · TAP = STOP`;p.className='rec'}else{p.textContent='⬇ SIMPAN VIDEO · TAP';p.className='save'}}
+$('pill').onclick=async()=>{const m=$('pill').dataset.m;if(m==='rec')return stopRec();if(!recBlob)return;
+ const f=new File([recBlob],`tsukuyomi-${Date.now()}.${recExt}`,{type:recBlob.type});let done=true;
+ try{if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:'Tsukuyomi'});else throw 0}
+ catch(e){if(e&&e.name==='AbortError')done=false;else{const a=document.createElement('a');a.href=URL.createObjectURL(recBlob);a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),20000)}}
+ if(done){$('pill').style.display='none';toast('VIDEO DISIMPAN')}};
+/* ---------- KALIBRASI TERPANDU ---------- */
+let calStep=0,calT=0,calS=[[],[]],calOK=0;
+const med=a=>[...a].sort((x,y)=>x-y)[Math.floor(a.length/2)],q25=a=>[...a].sort((x,y)=>x-y)[Math.floor(a.length*.25)];
+const GP=['','BUKA KEDUA MATA <b>LEBAR</b>','TUTUP MATA <b>KANAN</b> · biarkan KIRI terbuka','TUTUP MATA <b>KIRI</b> · biarkan KANAN terbuka'];
+function startCal(){calStep=1;calT=performance.now();calS=[[],[]];calOK=0;charge=0;eyes.forEach(e=>{e.cl=0;e.cal=false});guide()}
+function guide(p=0){const g=$('guide');if(!calStep){g.style.display='none';return}g.style.display='block';g.innerHTML=`<span style="color:#8f808b">KALIBRASI ${calStep}/3 · tap untuk lewati</span><br>${GP[calStep]}<i style="width:${p*100}%"></i>`}
+function finishCal(){calStep=0;const good=eyes.every(e=>e.op&&e.cl&&e.op-e.cl>.03);eyes.forEach(e=>e.cal=good);if(good){try{localStorage.setItem('tsk_cal',JSON.stringify(eyes.map(e=>({op:e.op,cl:e.cl,cal:true}))))}catch(x){}}guide();toast(good?'KALIBRASI SELESAI · COBA WINK':'KALIBRASI DILEWATI · MODE OTOMATIS')}
+function calRun(now){if(!calStep)return;const [R,L]=eyes;
+ if(calStep===1){const t=now-calT;if(t>400){calS[0].push(R.s);calS[1].push(L.s)}guide(clamp(t/2200));if(t>2200&&calS[0].length>6){R.op=med(calS[0]);L.op=med(calS[1]);calStep=2;calT=now;calS=[[],[]];calOK=0;sfxLock();guide()}return}
+ const c=calStep===2?R:L,o=calStep===2?L:R;if(now-calT>9000){finishCal();return}
+ if(c.s<.8*c.op&&o.s>1.2*c.s&&o.s>.55*o.op){calOK++;calS[0].push(c.s)}else calOK=Math.max(0,calOK-1);
+ guide(clamp(calOK/8));
+ if(calOK>=8){c.cl=q25(calS[0]);sfxLock();if(calStep===2){calStep=3;calT=now;calS=[[],[]];calOK=0;guide()}else finishCal()}}
 /* ---------- KONTROL ---------- */
-$('test').onclick=trigger;
-$('recal').onclick=recal;function recal(){eyes.forEach(e=>{e.base=.2;e.open=true});toast('KALIBRASI: BUKA KEDUA MATA LEBAR 2 DETIK')}
+$('test').onclick=()=>trigger('tsu');$('test2').onclick=()=>trigger('ama');
+$('recal').onclick=recal;function recal(){if(!camOn)return toast('AKTIFKAN KAMERA DULU');eyes.forEach(e=>{e.base=.2;e.open=true});startCal()}
 $('sens').oninput=e=>sens=+e.target.value;$('mode').onchange=e=>mode=e.target.value;
 $('mute').onclick=()=>{muted=!muted;$('mute').textContent='SUARA: '+(muted?'OFF':'ON');if(muted)sfxOff()};
 $('capture').onclick=()=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const x=c.getContext('2d'),vw=video.videoWidth||c.width,vh=video.videoHeight||c.height,s=Math.max(c.width/vw,c.height/vh);
@@ -201,9 +273,13 @@ $('enable').onclick=async()=>{const b=$('enable');b.disabled=true;b.textContent=
   if(!window.FaceMesh)throw Error('AI face tracking gagal dimuat. Periksa koneksi internet.');
   const face=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});face.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:.5,minTrackingConfidence:.5});face.onResults(onFace);await face.initialize();
   (async function loop(){if(video.readyState>=2){try{await face.send({image:video})}catch(e){}}requestAnimationFrame(loop)})();
-  try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}setLive('EYE SENSOR: ONLINE');const s=$('start');s.style.opacity=0;setTimeout(()=>s.remove(),520);toast('BUKA KEDUA MATA SEBENTAR UNTUK KALIBRASI')}
+  try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}setLive('EYE SENSOR: ONLINE');const s=$('start');s.style.opacity=0;setTimeout(()=>s.remove(),520);camOn=true;(eyes[0].cal&&eyes[1].cal)?toast('KALIBRASI TERSIMPAN · tekan KALIBRASI untuk ulang'):startCal()}
  catch(e){b.disabled=false;b.textContent='◉ AKTIFKAN EYE TRACKING';alert('Tidak dapat mengaktifkan kamera: '+e.message+'\n\nJalankan lewat localhost atau HTTPS dan izinkan kamera.')}};
 $('menuBtn').onclick=()=>$('ctrls').classList.toggle('show');
 $('fs').onclick=()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.()};
+$('rec1').onclick=()=>rec?stopRec():startRec(false);
+$('auto').onclick=()=>{recAuto=!recAuto;$('auto').textContent='AUTO REKAM: '+(recAuto?'ON':'OFF');if(recAuto)toast('AKAN MEREKAM OTOMATIS SAAT WINK')};
+$('guide').onclick=()=>finishCal();
+try{const d=JSON.parse(localStorage.getItem('tsk_cal')||'null');if(d&&d.length===2)d.forEach((x,i)=>Object.assign(eyes[i],x))}catch(e){}
 requestAnimationFrame(draw);
 </script></body></html>
